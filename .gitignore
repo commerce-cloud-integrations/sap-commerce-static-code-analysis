@@ -1,0 +1,16 @@
+.gradle/
+.kotlin/
+build/
+out/
+.idea/
+.vscode/
+.scannerwork/
+tmp/
+AGENTS.md
+agent-progress.txt
+init.sh
+tasks.json
+*.iml
+*.log
+*.tmp
+.DS_Store

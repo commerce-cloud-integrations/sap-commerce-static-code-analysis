@@ -1,0 +1,216 @@
+name: sapcc-lint reusable
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Release tag to download, for example v0.1.0.
+        required: true
+        type: string
+      repo_path:
+        description: Repository path to scan inside the caller workspace.
+        required: false
+        default: .
+        type: string
+      config_path:
+        description: Optional path to the analyzer config file inside the caller workspace.
+        required: false
+        default: ""
+        type: string
+      upload_sarif:
+        description: Upload SARIF to GitHub code scanning.
+        required: false
+        default: true
+        type: boolean
+      html_report:
+        description: Generate an HTML report and upload it as a workflow artifact.
+        required: false
+        default: false
+        type: boolean
+      csv_report:
+        description: Generate a CSV report and upload it as a workflow artifact.
+        required: false
+        default: false
+        type: boolean
+      reviewdog_comments:
+        description: Post reviewdog pull request comments for findings on changed lines.
+        required: false
+        default: true
+        type: boolean
+      html_output_path:
+        description: HTML output path inside the caller workspace.
+        required: false
+        default: build/reports/sapcc-lint.html
+        type: string
+      csv_output_path:
+        description: CSV output path inside the caller workspace.
+        required: false
+        default: build/reports/sapcc-lint.csv
+        type: string
+      sarif_output_path:
+        description: SARIF output path inside the caller workspace.
+        required: false
+        default: build/reports/sapcc-lint.sarif
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out caller repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Resolve workflow repository
+        id: workflow_repo
+        shell: bash
+        run: |
+          workflow_ref="${{ github.workflow_ref }}"
+          workflow_repo="${workflow_ref%%/.github/workflows/*}"
+          echo "workflow_repo=${workflow_repo}" >> "$GITHUB_OUTPUT"
+
+      - name: Download analyzer release bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release download "${{ inputs.version }}" \
+            --repo "${{ steps.workflow_repo.outputs.workflow_repo }}" \
+            --pattern "sap-cc-static-code-analysis-*.zip" \
+            --dir "$RUNNER_TEMP/sapcc-lint-release"
+
+      - name: Unpack analyzer release bundle
+        id: unpack
+        shell: bash
+        run: |
+          zip_path="$(find "$RUNNER_TEMP/sapcc-lint-release" -type f -name 'sap-cc-static-code-analysis-*.zip' -print -quit)"
+          test -n "$zip_path"
+          unzip -q "$zip_path" -d "$RUNNER_TEMP/sapcc-lint-dist"
+          binary_path="$(find "$RUNNER_TEMP/sapcc-lint-dist" -type f -path '*/bin/sap-cc-static-code-analysis' -print -quit)"
+          test -n "$binary_path"
+          chmod +x "$binary_path"
+          echo "binary_path=${binary_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Run sapcc-lint
+        id: sapcc_lint
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          args=(
+            scan
+            --repo "${{ inputs.repo_path }}"
+            --format console
+          )
+          if [[ -n "${{ inputs.config_path }}" ]]; then
+            args+=(--config "${{ inputs.config_path }}")
+          fi
+          if [[ "${{ inputs.upload_sarif }}" == "true" ]]; then
+            args+=(--format sarif --sarif-out "${{ inputs.sarif_output_path }}")
+          fi
+          if [[ "${{ inputs.html_report }}" == "true" ]]; then
+            args+=(--format html --html-out "${{ inputs.html_output_path }}")
+          fi
+          if [[ "${{ inputs.csv_report }}" == "true" ]]; then
+            args+=(--format csv --csv-out "${{ inputs.csv_output_path }}")
+          fi
+          if [[ "${{ inputs.reviewdog_comments }}" == "true" ]]; then
+            args+=(--format rdjsonl --rdjsonl-out "$RUNNER_TEMP/sapcc-lint-reviewdog.rdjsonl")
+          fi
+          "${{ steps.unpack.outputs.binary_path }}" "${args[@]}"
+          exit_code=$?
+          echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
+          exit "${exit_code}"
+
+      - name: Detect analyzer output files
+        id: output_files
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "${{ inputs.sarif_output_path }}" ]]; then
+            echo "sarif_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "sarif_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [[ -f "${{ inputs.html_output_path }}" ]]; then
+            echo "html_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "html_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [[ -f "${{ inputs.csv_output_path }}" ]]; then
+            echo "csv_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "csv_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [[ -f "$RUNNER_TEMP/sapcc-lint-reviewdog.rdjsonl" ]]; then
+            echo "rdjsonl_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "rdjsonl_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload SARIF results
+        if: ${{ always() && inputs.upload_sarif && steps.output_files.outputs.sarif_exists == 'true' }}
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ inputs.sarif_output_path }}
+
+      - name: Upload HTML report artifact
+        if: ${{ always() && inputs.html_report && steps.output_files.outputs.html_exists == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sapcc-lint-html-report
+          path: ${{ inputs.html_output_path }}
+
+      - name: Upload CSV report artifact
+        if: ${{ always() && inputs.csv_report && steps.output_files.outputs.csv_exists == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sapcc-lint-csv-report
+          path: ${{ inputs.csv_output_path }}
+
+      - name: Set up reviewdog
+        if: ${{ always() && github.event_name == 'pull_request' && inputs.reviewdog_comments && steps.output_files.outputs.rdjsonl_exists == 'true' }}
+        uses: reviewdog/action-setup@d8edf5727196fda3f4bb51d1484cb7d4c2135a0f
+
+      - name: Run reviewdog
+        id: reviewdog
+        if: ${{ always() && github.event_name == 'pull_request' && inputs.reviewdog_comments && steps.output_files.outputs.rdjsonl_exists == 'true' }}
+        continue-on-error: true
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          reviewdog \
+            -f=rdjsonl \
+            -name="sapcc-lint" \
+            -reporter=github-pr-review \
+            -filter-mode=added \
+            -fail-level=none \
+            -level=info \
+            < "$RUNNER_TEMP/sapcc-lint-reviewdog.rdjsonl"
+
+      - name: Warn if reviewdog could not post comments
+        if: ${{ always() && steps.reviewdog.outcome == 'failure' }}
+        shell: bash
+        run: |
+          echo "::warning::reviewdog could not post pull request review comments. Check pull-requests: write permissions; SARIF upload and analyzer gating still apply."
+
+      - name: Enforce analyzer exit code
+        if: always()
+        shell: bash
+        run: |
+          exit_code="${{ steps.sapcc_lint.outputs.exit_code }}"
+          if [[ -z "${exit_code}" ]]; then
+            exit_code=2
+          fi
+          exit "${exit_code}"

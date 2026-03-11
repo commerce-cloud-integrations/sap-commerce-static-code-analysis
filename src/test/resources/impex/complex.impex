@@ -1,0 +1,5 @@
+$productCatalog=electronicsProductCatalog
+$productCatalogVersion=catalogversion(catalog(id[default=$productCatalog]),version[default='Staged'])
+INSERT_UPDATE Product[batchmode=true];code[unique=true];catalogVersion(catalog(id[default=$productCatalog]),version)[unique=true];supercategories(code,catalogVersion(catalog(id),version))[mode=append];@media[translator="de.hybris.platform.impex.jalo.media.MediaDataTranslator"];&productRef
+;demo-1;$productCatalogVersion;cat-a,cat-b;jar:my-media;&productRef
+VariantProduct;demo-2;$productCatalogVersion;;
