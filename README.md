@@ -1,11 +1,10 @@
-# sap-cc-static-code-analysis
+# SAP Commerce Static Code Analysis
 
 Standalone SAP Commerce static analysis for local validation, CI, and reusable GitHub Actions.
 
 The analyzer scans supported SAP Commerce source domains and reports findings in console, HTML, CSV, SARIF, and rdjsonl formats. It is intended for repository validation in local development, pull requests, and shared CI workflows.
 
-This project is based on the SAP Commerce IntelliJ IDEA plugin inspection surface from EPAM's `sap-commerce-intellij-idea-plugin` repository:
-https://github.com/epam/sap-commerce-intellij-idea-plugin
+This project is based on the SAP Commerce IntelliJ IDEA plugin inspection surface from EPAM's [sap-commerce-intellij-idea-plugin](https://github.com/epam/sap-commerce-intellij-idea-plugin) repository.
 
 ## What It Checks
 
@@ -20,6 +19,10 @@ The current analyzer covers these domains:
 - `business-process`: process XML
 
 Detailed rule coverage lives in [docs/rules.md](docs/rules.md).
+
+Example pull-request review comments from the reusable workflow:
+
+![sap-cc-lint reviewdog pull-request comments](img/comments.png)
 
 ## Requirements
 
