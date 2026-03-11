@@ -1633,37 +1633,34 @@ private data class ImpexSupportContext(
         ownerTypes: Set<String>,
         confidentOwnerTypes: Set<String>,
     ): Boolean {
-        return confidentOwnerTypes.isNotEmpty() ||
-            (hasFullPlatformContext && ownerTypes.any(::isResolvableType))
+        return confidentOwnerTypes.isNotEmpty()
     }
 
     fun canConfidentlyValidateAttributes(typeName: String): Boolean {
-        if (hasFullPlatformContext && isResolvableType(typeName)) {
-            return true
-        }
-
         val records = catalog.findItemTypes(typeName)
         if (records.isEmpty()) {
             return false
         }
 
-        return records.all { record ->
-            var currentType = record.declaration.extendsType.value
-            while (currentType != null) {
-                if (currentType in knownPlatformItemRoots) {
-                    break
-                }
-                if (!catalog.hasLocalDeclaredType(currentType)) {
-                    return@all false
-                }
-                currentType = catalog.findItemTypes(currentType)
-                    .firstOrNull()
-                    ?.declaration
-                    ?.extendsType
-                    ?.value
+        return records.all(::hasLocallyCompleteAttributeModel)
+    }
+
+    private fun hasLocallyCompleteAttributeModel(record: com.cci.sapcclint.catalog.ItemTypeRecord): Boolean {
+        var currentRecord: com.cci.sapcclint.catalog.ItemTypeRecord? = record
+        var sawLocalDeployment = record.declaration.deployment != null
+
+        while (currentRecord != null) {
+            val parentType = currentRecord.declaration.extendsType.value ?: return sawLocalDeployment
+            if (parentType in knownPlatformItemRoots) {
+                return sawLocalDeployment
             }
-            true
+
+            val parentRecord = catalog.findItemTypes(parentType).firstOrNull() ?: return false
+            currentRecord = parentRecord
+            sawLocalDeployment = sawLocalDeployment || currentRecord.declaration.deployment != null
         }
+
+        return sawLocalDeployment
     }
 
     fun canConfidentlyValidateIndexes(typeName: String?): Boolean {

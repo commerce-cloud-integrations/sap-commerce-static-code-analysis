@@ -104,6 +104,39 @@ class ImpexDomainAnalyzerTest {
     }
 
     @Test
+    fun analyze_whenPlatformTypeIsExtendedLocally_skipsUnknownAttributeFindingsForThatType() {
+        val repo = Files.createTempDirectory("sapcc-lint-impex-platform-overlay")
+        repo.resolve("bin/platform").createDirectories()
+        writeItemsFile(
+            repo,
+            """
+            <items>
+              <itemtypes>
+                <itemtype code="Product" extends="GenericItem" autocreate="false" generate="false">
+                  <attributes>
+                    <attribute qualifier="customFlag" type="java.lang.String"/>
+                  </attributes>
+                </itemtype>
+              </itemtypes>
+            </items>
+            """.trimIndent()
+        )
+        repo.resolve("resources/projectdata.impex").apply {
+            parent.createDirectories()
+            writeText(
+                """
+                INSERT Product;code;customFlag
+                ;demo;flag
+                """.trimIndent()
+            )
+        }
+
+        val findings = analyze(repo).filter { it.ruleId == "ImpExUnknownTypeAttributeInspection" }
+
+        assertTrue(findings.isEmpty())
+    }
+
+    @Test
     fun analyze_whenModifiersAreUnknown_respectsTranslatorEscapeHatch() {
         val repo = Files.createTempDirectory("sapcc-lint-impex-unknown-modifiers")
         writeItemsFile(

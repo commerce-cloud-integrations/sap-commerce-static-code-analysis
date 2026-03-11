@@ -43,9 +43,9 @@ jobs:
       contents: read
       pull-requests: write
       security-events: write
-    uses: <owner>/<repo>/.github/workflows/sapcc-lint-reusable.yml@v0.1.3
+    uses: <owner>/<repo>/.github/workflows/sapcc-lint-reusable.yml@v0.1.4
     with:
-      version: v0.1.3
+      version: v0.1.4
       repo_path: .
       html_report: true
       csv_report: true
@@ -53,7 +53,7 @@ jobs:
 
 ## Reusable Workflow Inputs
 
-- `version`: required release tag to download, for example `v0.1.3`
+- `version`: required release tag to download, for example `v0.1.4`
 - `repo_path`: path to scan inside the caller workspace, default `.`
 - `config_path`: optional config file path in the caller workspace, default empty
 - `upload_sarif`: upload SARIF to code scanning, default `true`
@@ -112,7 +112,7 @@ That workflow:
 
 Consumer repositories should pin both:
 
-- the reusable workflow reference, for example `@v0.1.3`
-- the `version` input, for example `v0.1.3`
+- the reusable workflow reference, for example `@v0.1.4`
+- the `version` input, for example `v0.1.4`
 
 Those values should normally match the same release tag.

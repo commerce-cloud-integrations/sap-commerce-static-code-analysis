@@ -171,15 +171,15 @@ jobs:
       contents: read
       pull-requests: write
       security-events: write
-    uses: <owner>/<repo>/.github/workflows/sapcc-lint-reusable.yml@v0.1.3
+    uses: <owner>/<repo>/.github/workflows/sapcc-lint-reusable.yml@v0.1.4
     with:
-      version: v0.1.3
+      version: v0.1.4
       repo_path: .
       html_report: true
       csv_report: true
 ```
 
-Pin the workflow reference and the `version` input to the same published release tag, for example `v0.1.3`.
+Pin the workflow reference and the `version` input to the same published release tag, for example `v0.1.4`.
 
 Reusable workflow inputs, artifact behavior, reviewdog behavior, and release pinning are documented in [docs/github-actions.md](docs/github-actions.md).
 
