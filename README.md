@@ -53,6 +53,15 @@ If the config file is not inside the directory you pass to `--repo`, point to it
   --config /path/to/sap-commerce-repo/.sapcc-lint.yml
 ```
 
+Filter reported findings and exit-code enforcement to a newline-delimited file list while still analyzing the full repository for context:
+
+```bash
+./build/install/sap-cc-static-code-analysis/bin/sap-cc-static-code-analysis \
+  scan \
+  --repo /path/to/sap-commerce-repo \
+  --report-paths-file build/changed-files.txt
+```
+
 Limit the scan to selected domains by repeating `--domain`:
 
 ```bash
@@ -162,19 +171,21 @@ jobs:
       contents: read
       pull-requests: write
       security-events: write
-    uses: <owner>/<repo>/.github/workflows/sapcc-lint-reusable.yml@v0.1.2
+    uses: <owner>/<repo>/.github/workflows/sapcc-lint-reusable.yml@v0.1.3
     with:
-      version: v0.1.2
+      version: v0.1.3
       repo_path: .
       html_report: true
       csv_report: true
 ```
 
-Pin the workflow reference and the `version` input to the same published release tag, for example `v0.1.2`.
+Pin the workflow reference and the `version` input to the same published release tag, for example `v0.1.3`.
 
 Reusable workflow inputs, artifact behavior, reviewdog behavior, and release pinning are documented in [docs/github-actions.md](docs/github-actions.md).
 
 The reusable workflow always downloads the analyzer ZIP from `commerce-cloud-integrations/sap-commerce-static-code-analysis` releases. Consumer repositories only need to pin the workflow ref and `version` input to the same published tag.
+
+On pull requests, the reusable workflow analyzes the whole repository for cross-file context but filters console output, downloadable reports, reviewdog input, and exit-code enforcement to the changed files by default. Set `pull_request_changed_files_only: false` if you want full-repository PR artifacts and gating instead.
 
 If a SARIF report exceeds GitHub code scanning's per-run result limit, the workflow skips SARIF upload automatically and emits a warning while still enforcing the analyzer exit code and uploading the requested HTML or CSV artifacts.
 

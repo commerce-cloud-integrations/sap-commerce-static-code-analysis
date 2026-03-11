@@ -7,6 +7,7 @@ import com.cci.sapcclint.reporting.HtmlReporter
 import com.cci.sapcclint.reporting.RdjsonlReporter
 import com.cci.sapcclint.reporting.SarifReporter
 import com.cci.sapcclint.scanner.RepositoryScanner
+import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
@@ -31,7 +32,10 @@ class ScanCommand(
         return try {
             val config = configLoader.load(resolveConfigPath(options))
             val scan = repositoryScanner.scan(options.repo, config, options.domains)
-            val result = repositoryAnalyzer.analyze(options.repo, config, scan)
+            val result = filterReportedFindings(
+                repositoryAnalyzer.analyze(options.repo, config, scan),
+                options.reportPathsFile,
+            )
 
             if (OutputFormat.CONSOLE in options.formats) {
                 consoleReporter.write(result, System.out)
@@ -59,11 +63,64 @@ class ScanCommand(
     private fun resolveConfigPath(options: ScanOptions): Path? {
         return options.config ?: options.repo.resolve(".sapcc-lint.yml")
     }
+
+    private fun filterReportedFindings(result: AnalysisResult, reportPathsFile: Path?): AnalysisResult {
+        if (reportPathsFile == null) {
+            return result
+        }
+
+        val allowedPaths = loadReportedPaths(result.repo, reportPathsFile)
+        val filteredFindings = result.findings.filter { finding ->
+            reportedPathFor(result.repo, finding.location.file) in allowedPaths
+        }
+        val reportedRuleIds = filteredFindings.map { it.ruleId }.toSet()
+
+        return result.copy(
+            findings = filteredFindings,
+            rules = result.rules.filter { it.ruleId in reportedRuleIds },
+        )
+    }
+
+    private fun loadReportedPaths(repo: Path, reportPathsFile: Path): Set<String> {
+        val normalizedRepo = repo.toAbsolutePath().normalize()
+
+        return Files.readAllLines(reportPathsFile)
+            .asSequence()
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .map { rawPath ->
+                val candidate = Paths.get(rawPath)
+                val normalizedPath = if (candidate.isAbsolute) {
+                    candidate.normalize()
+                } else {
+                    normalizedRepo.resolve(candidate).normalize()
+                }
+
+                if (normalizedPath.startsWith(normalizedRepo)) {
+                    normalizedRepo.relativize(normalizedPath).toReportPath()
+                } else {
+                    normalizedPath.toReportPath()
+                }
+            }
+            .toSet()
+    }
+
+    private fun reportedPathFor(repo: Path, file: Path): String {
+        val normalizedRepo = repo.toAbsolutePath().normalize()
+        val normalizedFile = file.toAbsolutePath().normalize()
+
+        return if (normalizedFile.startsWith(normalizedRepo)) {
+            normalizedRepo.relativize(normalizedFile).toReportPath()
+        } else {
+            normalizedFile.toReportPath()
+        }
+    }
 }
 
 data class ScanOptions(
     val repo: Path,
     val config: Path?,
+    val reportPathsFile: Path?,
     val formats: Set<OutputFormat>,
     val htmlOut: Path?,
     val csvOut: Path?,
@@ -104,6 +161,7 @@ class ScanOptionsParser {
         return ScanOptions(
             repo = repo.normalize(),
             config = state.config?.normalize(),
+            reportPathsFile = state.reportPathsFile?.normalize(),
             formats = state.formats,
             htmlOut = state.htmlOut?.normalize(),
             csvOut = state.csvOut?.normalize(),
@@ -118,6 +176,7 @@ class ScanOptionsParser {
         return when (token) {
             "--repo" -> readPath(args, index + 1, token)?.also { state.repo = it }?.let { index + 2 }
             "--config" -> readPath(args, index + 1, token)?.also { state.config = it }?.let { index + 2 }
+            "--report-paths-file" -> readPath(args, index + 1, token)?.also { state.reportPathsFile = it }?.let { index + 2 }
             "--format" -> consumeFormat(args, index, state)
             "--html-out" -> readPath(args, index + 1, token)?.also { state.htmlOut = it }?.let { index + 2 }
             "--csv-out" -> readPath(args, index + 1, token)?.also { state.csvOut = it }?.let { index + 2 }
@@ -193,6 +252,7 @@ class ScanOptionsParser {
     private data class ParserState(
         var repo: Path? = null,
         var config: Path? = null,
+        var reportPathsFile: Path? = null,
         val formats: LinkedHashSet<OutputFormat> = linkedSetOf(OutputFormat.CONSOLE),
         var explicitFormatSeen: Boolean = false,
         var htmlOut: Path? = null,
@@ -202,3 +262,5 @@ class ScanOptionsParser {
         val domains: LinkedHashSet<AnalysisDomain> = linkedSetOf(),
     )
 }
+
+private fun Path.toReportPath(): String = toString().replace('\\', '/')

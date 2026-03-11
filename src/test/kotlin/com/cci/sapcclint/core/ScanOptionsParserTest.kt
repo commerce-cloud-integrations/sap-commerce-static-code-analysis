@@ -16,10 +16,25 @@ class ScanOptionsParserTest {
         assertEquals(Paths.get(".").normalize(), options?.repo)
         assertEquals(setOf(OutputFormat.CONSOLE), options?.formats)
         assertEquals(emptySet(), options?.domains)
+        assertNull(options?.reportPathsFile)
         assertNull(options?.htmlOut)
         assertNull(options?.csvOut)
         assertNull(options?.sarifOut)
         assertNull(options?.rdjsonlOut)
+    }
+
+    @Test
+    fun parse_whenReportPathsFileIsProvided_keepsThatPath() {
+        val options = parser.parse(
+            listOf(
+                "--repo",
+                ".",
+                "--report-paths-file",
+                "build/changed-files.txt",
+            )
+        )
+
+        assertEquals(Paths.get("build/changed-files.txt").normalize(), options?.reportPathsFile)
     }
 
     @Test

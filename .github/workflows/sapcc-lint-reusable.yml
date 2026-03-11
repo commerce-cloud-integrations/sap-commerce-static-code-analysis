@@ -22,6 +22,11 @@ on:
         required: false
         default: true
         type: boolean
+      pull_request_changed_files_only:
+        description: On pull requests, filter findings, artifacts, and gating to changed files while keeping full-repository analysis context.
+        required: false
+        default: true
+        type: boolean
       html_report:
         description: Generate an HTML report and upload it as a workflow artifact.
         required: false
@@ -65,6 +70,8 @@ jobs:
     steps:
       - name: Check out caller repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -94,6 +101,25 @@ jobs:
           chmod +x "$binary_path"
           echo "binary_path=${binary_path}" >> "$GITHUB_OUTPUT"
 
+      - name: Collect changed pull request files
+        id: changed_files
+        if: ${{ github.event_name == 'pull_request' && inputs.pull_request_changed_files_only }}
+        shell: bash
+        run: |
+          report_paths_file="$RUNNER_TEMP/sapcc-lint-changed-files.txt"
+          if git rev-parse --verify HEAD^1 >/dev/null 2>&1 && git rev-parse --verify HEAD^2 >/dev/null 2>&1; then
+            git diff --name-only --diff-filter=ACMR HEAD^1 HEAD^2 > "$report_paths_file"
+          else
+            echo "::warning::Could not determine pull request merge parents; falling back to full-repository reporting."
+            : > "$report_paths_file"
+          fi
+          if [[ -s "$report_paths_file" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "path_file=$report_paths_file" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run sapcc-lint
         id: sapcc_lint
         continue-on-error: true
@@ -107,6 +133,9 @@ jobs:
           )
           if [[ -n "${{ inputs.config_path }}" ]]; then
             args+=(--config "${{ inputs.config_path }}")
+          fi
+          if [[ "${{ steps.changed_files.outputs.enabled }}" == "true" ]]; then
+            args+=(--report-paths-file "${{ steps.changed_files.outputs.path_file }}")
           fi
           if [[ "${{ inputs.upload_sarif }}" == "true" ]]; then
             args+=(--format sarif --sarif-out "${{ inputs.sarif_output_path }}")

@@ -29,7 +29,7 @@ class AnalyzerApplication {
         println(
             """
             Usage:
-              sapcc-lint scan --repo <path> [--config <path>] [--domain <type-system|project|manifest|impex|bean-system|cockpit-ng|business-process>] [--format <console|html|csv|sarif|rdjsonl>] [--html-out <path>] [--csv-out <path>] [--sarif-out <path>] [--rdjsonl-out <path>]
+              sapcc-lint scan --repo <path> [--config <path>] [--report-paths-file <path>] [--domain <type-system|project|manifest|impex|bean-system|cockpit-ng|business-process>] [--format <console|html|csv|sarif|rdjsonl>] [--html-out <path>] [--csv-out <path>] [--sarif-out <path>] [--rdjsonl-out <path>]
             """.trimIndent()
         )
     }

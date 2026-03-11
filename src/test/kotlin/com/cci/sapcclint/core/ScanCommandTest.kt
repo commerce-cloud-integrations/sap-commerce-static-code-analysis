@@ -148,6 +148,130 @@ class ScanCommandTest {
     }
 
     @Test
+    fun run_whenReportPathsFileIsProvided_filtersArtifactsAndExitCodeToMatchingFiles() {
+        val repo = Files.createTempDirectory("sapcc-lint-scan-report-paths")
+        val firstItemsFile = repo.resolve("custom/core/resources/first-items.xml")
+        val secondItemsFile = repo.resolve("custom/core/resources/second-items.xml")
+        val reportPathsFile = repo.resolve("build/changed-files.txt")
+        val sarifOut = repo.resolve("build/reports/findings.sarif")
+        firstItemsFile.parent.createDirectories()
+        reportPathsFile.parent.createDirectories()
+        firstItemsFile.writeText(
+            """
+            <items>
+              <itemtypes>
+                <itemtype code="FirstType">
+                  <deployment table="firsttype" typecode="12000"/>
+                </itemtype>
+              </itemtypes>
+            </items>
+            """.trimIndent()
+        )
+        secondItemsFile.writeText(
+            """
+            <items>
+              <itemtypes>
+                <itemtype code="SecondType">
+                  <deployment table="secondtype" typecode="12000"/>
+                </itemtype>
+              </itemtypes>
+            </items>
+            """.trimIndent()
+        )
+        reportPathsFile.writeText("custom/core/resources/first-items.xml\n")
+
+        val stdout = ByteArrayOutputStream()
+        val stderr = ByteArrayOutputStream()
+
+        val exitCode = withRedirectedStreams(stdout, stderr) {
+            ScanCommand().run(
+                listOf(
+                    "--repo", repo.toString(),
+                    "--report-paths-file", reportPathsFile.toString(),
+                    "--format", "console",
+                    "--format", "sarif",
+                    "--sarif-out", sarifOut.toString(),
+                )
+            )
+        }
+
+        assertEquals(1, exitCode)
+        val consoleOutput = stdout.toString()
+        assertTrue(consoleOutput.contains("Findings: 1 error(s), 0 warning(s)"))
+        assertTrue(consoleOutput.contains("custom/core/resources/first-items.xml"))
+        assertTrue(!consoleOutput.contains("custom/core/resources/second-items.xml"))
+
+        val sarif = objectMapper.readTree(sarifOut.toFile())
+        assertEquals(1, sarif["runs"][0]["results"].size())
+        assertEquals(
+            "custom/core/resources/first-items.xml",
+            sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"].asText()
+        )
+        assertTrue(stderr.toString().isBlank())
+    }
+
+    @Test
+    fun run_whenReportPathsFileOmitsFailingFiles_returnsSuccess() {
+        val repo = Files.createTempDirectory("sapcc-lint-scan-report-paths-success")
+        val firstFailingItemsFile = repo.resolve("custom/core/resources/first-failing-items.xml")
+        val secondFailingItemsFile = repo.resolve("custom/core/resources/second-failing-items.xml")
+        val cleanItemsFile = repo.resolve("custom/core/resources/clean-items.xml")
+        val reportPathsFile = repo.resolve("build/changed-files.txt")
+        firstFailingItemsFile.parent.createDirectories()
+        reportPathsFile.parent.createDirectories()
+        firstFailingItemsFile.writeText(
+            """
+            <items>
+              <itemtypes>
+                <itemtype code="FirstType">
+                  <deployment table="firsttype" typecode="12000"/>
+                </itemtype>
+              </itemtypes>
+            </items>
+            """.trimIndent()
+        )
+        secondFailingItemsFile.writeText(
+            """
+            <items>
+              <itemtypes>
+                <itemtype code="SecondType">
+                  <deployment table="secondtype" typecode="12000"/>
+                </itemtype>
+              </itemtypes>
+            </items>
+            """.trimIndent()
+        )
+        cleanItemsFile.writeText(
+            """
+            <items>
+              <itemtypes>
+                <itemtype code="CleanType">
+                  <deployment table="cleantype" typecode="13000"/>
+                </itemtype>
+              </itemtypes>
+            </items>
+            """.trimIndent()
+        )
+        reportPathsFile.writeText("custom/core/resources/clean-items.xml\n")
+
+        val stdout = ByteArrayOutputStream()
+        val stderr = ByteArrayOutputStream()
+
+        val exitCode = withRedirectedStreams(stdout, stderr) {
+            ScanCommand().run(
+                listOf(
+                    "--repo", repo.toString(),
+                    "--report-paths-file", reportPathsFile.toString(),
+                )
+            )
+        }
+
+        assertEquals(0, exitCode)
+        assertTrue(stdout.toString().contains("No findings."))
+        assertTrue(stderr.toString().isBlank())
+    }
+
+    @Test
     fun run_whenHtmlAndCsvAreRequested_writesReadableAndFlatReports() {
         val repo = Files.createTempDirectory("sapcc-lint-scan-html-csv")
         val itemsFile = repo.resolve("custom/core/resources/custom-items.xml")
