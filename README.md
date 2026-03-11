@@ -187,6 +187,13 @@ The reusable workflow always downloads the analyzer ZIP from `commerce-cloud-int
 
 On pull requests, the reusable workflow analyzes the whole repository for cross-file context but filters console output, downloadable reports, reviewdog input, and exit-code enforcement to the changed files by default. Set `pull_request_changed_files_only: false` if you want full-repository PR artifacts and gating instead.
 
+By default, the reusable workflow enables both SARIF upload and reviewdog comments. That means a consumer pull request can show both GitHub Code Scanning annotations and reviewdog review comments for the same changed lines.
+
+If you want only one reporting channel:
+
+- set `upload_sarif: false` to keep reviewdog comments but disable Code Scanning annotations
+- set `reviewdog_comments: false` to keep Code Scanning annotations but disable reviewdog comments
+
 If a SARIF report exceeds GitHub code scanning's per-run result limit, the workflow skips SARIF upload automatically and emits a warning while still enforcing the analyzer exit code and uploading the requested HTML or CSV artifacts.
 
 ## Documentation

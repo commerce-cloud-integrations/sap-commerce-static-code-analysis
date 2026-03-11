@@ -17,6 +17,8 @@ That workflow:
 - uploads SARIF to GitHub code scanning
 - posts reviewdog pull request comments on changed lines when permissions allow
 
+Because both channels are enabled there, pull requests for this repository can show both Code Scanning annotations and reviewdog comments for the same findings.
+
 Required permissions:
 
 - `contents: read`
@@ -73,6 +75,7 @@ Operational notes:
 - HTML and CSV reports are generated and uploaded only when their corresponding workflow options are enabled
 - SARIF and rdjsonl are generated only when their corresponding workflow options are enabled
 - if a SARIF file exists but contains more than 25000 results, the workflow skips the upload step and emits a warning because GitHub code scanning would reject that report
+- `upload_sarif` defaults to `true` and `reviewdog_comments` also defaults to `true`, so the reusable workflow will emit both Code Scanning alerts and reviewdog comments unless you disable one explicitly
 
 ## What The Reusable Workflow Does
 
@@ -99,6 +102,31 @@ That means:
 - analyzer exit codes still control whether the job fails
 
 If reviewdog cannot comment, the workflow emits a warning and keeps SARIF upload plus analyzer gating intact. Reviewdog comments are labeled `sap-cc-lint`.
+
+## SARIF And Reviewdog Together
+
+SARIF and reviewdog are separate reporting channels:
+
+- SARIF produces GitHub Code Scanning annotations and alerts
+- reviewdog produces pull-request review comments
+
+When both are enabled, the same finding can appear in both places. That is expected.
+
+If you want only reviewdog comments:
+
+```yaml
+with:
+  upload_sarif: false
+  reviewdog_comments: true
+```
+
+If you want only Code Scanning alerts:
+
+```yaml
+with:
+  upload_sarif: true
+  reviewdog_comments: false
+```
 
 ## Releases
 

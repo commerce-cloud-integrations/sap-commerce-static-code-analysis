@@ -10,6 +10,13 @@ The analyzer supports multiple output formats from a single scan. You can reques
 - `sarif`: machine-readable JSON for GitHub code scanning
 - `rdjsonl`: machine-readable JSON Lines for reviewdog PR comments
 
+SARIF and rdjsonl serve different workflow integrations:
+
+- `sarif` is for GitHub Code Scanning
+- `rdjsonl` is for reviewdog pull-request comments
+
+If a workflow enables both, the same finding can surface in both channels.
+
 ## CLI Usage
 
 Console is the default when no explicit `--format` values are provided:
@@ -129,7 +136,7 @@ HTML only:
 
 ```yaml
 with:
-  version: v0.1.0
+  version: v0.1.4
   html_report: true
 ```
 
@@ -137,7 +144,7 @@ CSV only:
 
 ```yaml
 with:
-  version: v0.1.0
+  version: v0.1.4
   csv_report: true
 ```
 
@@ -145,7 +152,7 @@ Both:
 
 ```yaml
 with:
-  version: v0.1.0
+  version: v0.1.4
   html_report: true
   csv_report: true
 ```
@@ -154,5 +161,7 @@ When enabled through the reusable workflow:
 
 - HTML is uploaded as artifact `sapcc-lint-html-report`
 - CSV is uploaded as artifact `sapcc-lint-csv-report`
+
+If the reusable workflow also keeps its default `upload_sarif: true` and `reviewdog_comments: true` settings, the pull request can receive both Code Scanning alerts and reviewdog comments alongside those artifacts.
 
 See [github-actions.md](github-actions.md) for the full reusable workflow interface.
