@@ -43,9 +43,9 @@ jobs:
       contents: read
       pull-requests: write
       security-events: write
-    uses: <owner>/<repo>/.github/workflows/sapcc-lint-reusable.yml@v0.1.1
+    uses: <owner>/<repo>/.github/workflows/sapcc-lint-reusable.yml@v0.1.2
     with:
-      version: v0.1.1
+      version: v0.1.2
       repo_path: .
       html_report: true
       csv_report: true
@@ -53,7 +53,7 @@ jobs:
 
 ## Reusable Workflow Inputs
 
-- `version`: required release tag to download, for example `v0.1.1`
+- `version`: required release tag to download, for example `v0.1.2`
 - `repo_path`: path to scan inside the caller workspace, default `.`
 - `config_path`: optional config file path in the caller workspace, default empty
 - `upload_sarif`: upload SARIF to code scanning, default `true`
@@ -70,6 +70,7 @@ Operational notes:
 - if `config_path` is empty, the analyzer falls back to `<repo_path>/.sapcc-lint.yml`
 - HTML and CSV reports are generated and uploaded only when their corresponding workflow options are enabled
 - SARIF and rdjsonl are generated only when their corresponding workflow options are enabled
+- if a SARIF file exists but contains more than 25000 results, the workflow skips the upload step and emits a warning because GitHub code scanning would reject that report
 
 ## What The Reusable Workflow Does
 
@@ -80,7 +81,7 @@ The reusable workflow:
 - unpacks the CLI
 - runs the CLI against the caller workspace
 - uploads HTML and CSV artifacts when enabled
-- uploads SARIF when enabled
+- uploads SARIF when enabled and within GitHub's per-run result limits
 - runs reviewdog on pull requests when enabled and permissions allow
 - preserves analyzer exit codes for job pass or fail behavior
 
@@ -94,7 +95,7 @@ That means:
 - unchanged-line findings still remain visible in console output and SARIF
 - analyzer exit codes still control whether the job fails
 
-If reviewdog cannot comment, the workflow emits a warning and keeps SARIF upload plus analyzer gating intact.
+If reviewdog cannot comment, the workflow emits a warning and keeps SARIF upload plus analyzer gating intact. Reviewdog comments are labeled `sap-cc-lint`.
 
 ## Releases
 
@@ -108,7 +109,7 @@ That workflow:
 
 Consumer repositories should pin both:
 
-- the reusable workflow reference, for example `@v0.1.1`
-- the `version` input, for example `v0.1.1`
+- the reusable workflow reference, for example `@v0.1.2`
+- the `version` input, for example `v0.1.2`
 
 Those values should normally match the same release tag.

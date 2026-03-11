@@ -162,19 +162,21 @@ jobs:
       contents: read
       pull-requests: write
       security-events: write
-    uses: <owner>/<repo>/.github/workflows/sapcc-lint-reusable.yml@v0.1.1
+    uses: <owner>/<repo>/.github/workflows/sapcc-lint-reusable.yml@v0.1.2
     with:
-      version: v0.1.1
+      version: v0.1.2
       repo_path: .
       html_report: true
       csv_report: true
 ```
 
-Pin the workflow reference and the `version` input to the same published release tag, for example `v0.1.1`.
+Pin the workflow reference and the `version` input to the same published release tag, for example `v0.1.2`.
 
 Reusable workflow inputs, artifact behavior, reviewdog behavior, and release pinning are documented in [docs/github-actions.md](docs/github-actions.md).
 
 The reusable workflow always downloads the analyzer ZIP from `commerce-cloud-integrations/sap-commerce-static-code-analysis` releases. Consumer repositories only need to pin the workflow ref and `version` input to the same published tag.
+
+If a SARIF report exceeds GitHub code scanning's per-run result limit, the workflow skips SARIF upload automatically and emits a warning while still enforcing the analyzer exit code and uploading the requested HTML or CSV artifacts.
 
 ## Documentation
 

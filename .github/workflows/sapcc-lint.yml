@@ -17,13 +17,14 @@ permissions:
 
 jobs:
   analyze:
+    name: sap-cc-lint repository scan
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -55,40 +56,84 @@ jobs:
           echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
           exit "${exit_code}"
 
+      - name: Detect analyzer output files
+        id: output_files
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f build/reports/sapcc-lint.sarif ]]; then
+            echo "sarif_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "sarif_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [[ -f build/reports/sapcc-lint.html ]]; then
+            echo "html_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "html_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [[ -f build/reports/sapcc-lint.csv ]]; then
+            echo "csv_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "csv_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [[ -f build/reports/sapcc-lint.rdjsonl ]]; then
+            echo "rdjsonl_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "rdjsonl_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [[ -f build/reports/sapcc-lint.sarif ]]; then
+            sarif_result_count="$(python3 -c 'import json, sys; data = json.load(open(sys.argv[1], encoding="utf-8")); print(sum(len(run.get("results", [])) for run in data.get("runs", [])))' build/reports/sapcc-lint.sarif)"
+            echo "sarif_result_count=${sarif_result_count}" >> "$GITHUB_OUTPUT"
+            if (( sarif_result_count <= 25000 )); then
+              echo "sarif_uploadable=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "sarif_uploadable=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "sarif_result_count=0" >> "$GITHUB_OUTPUT"
+            echo "sarif_uploadable=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Upload SARIF results
-        if: ${{ always() && hashFiles('build/reports/sapcc-lint.sarif') != '' }}
-        uses: github/codeql-action/upload-sarif@v3
+        if: ${{ always() && steps.output_files.outputs.sarif_exists == 'true' && steps.output_files.outputs.sarif_uploadable == 'true' }}
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: build/reports/sapcc-lint.sarif
 
+      - name: Warn when SARIF upload is skipped
+        if: ${{ always() && steps.output_files.outputs.sarif_exists == 'true' && steps.output_files.outputs.sarif_uploadable != 'true' }}
+        shell: bash
+        run: |
+          echo "::warning::Skipping SARIF upload because the report contains ${{ steps.output_files.outputs.sarif_result_count }} results and GitHub code scanning rejects runs above 25000 results. HTML/CSV artifacts and analyzer exit-code enforcement still apply."
+
       - name: Upload HTML report artifact
-        if: ${{ always() && hashFiles('build/reports/sapcc-lint.html') != '' }}
-        uses: actions/upload-artifact@v4
+        if: ${{ always() && steps.output_files.outputs.html_exists == 'true' }}
+        uses: actions/upload-artifact@v6
         with:
           name: sapcc-lint-html-report
           path: build/reports/sapcc-lint.html
 
       - name: Upload CSV report artifact
-        if: ${{ always() && hashFiles('build/reports/sapcc-lint.csv') != '' }}
-        uses: actions/upload-artifact@v4
+        if: ${{ always() && steps.output_files.outputs.csv_exists == 'true' }}
+        uses: actions/upload-artifact@v6
         with:
           name: sapcc-lint-csv-report
           path: build/reports/sapcc-lint.csv
 
       - name: Set up reviewdog
-        if: ${{ always() && github.event_name == 'pull_request' && hashFiles('build/reports/sapcc-lint.rdjsonl') != '' }}
+        if: ${{ always() && github.event_name == 'pull_request' && steps.output_files.outputs.rdjsonl_exists == 'true' }}
         uses: reviewdog/action-setup@d8edfce3dd5e1ec6978745e801f9c50b5ef80252
 
       - name: Run reviewdog
         id: reviewdog
-        if: ${{ always() && github.event_name == 'pull_request' && hashFiles('build/reports/sapcc-lint.rdjsonl') != '' }}
+        if: ${{ always() && github.event_name == 'pull_request' && steps.output_files.outputs.rdjsonl_exists == 'true' }}
         continue-on-error: true
         env:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ github.token }}
         run: |
           reviewdog \
             -f=rdjsonl \
-            -name="sapcc-lint" \
+            -name="sap-cc-lint" \
             -reporter=github-pr-review \
             -filter-mode=added \
             -fail-level=none \

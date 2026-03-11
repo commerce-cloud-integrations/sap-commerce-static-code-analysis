@@ -60,13 +60,14 @@ permissions:
 
 jobs:
   analyze:
+    name: sap-cc-lint scan
     runs-on: ubuntu-latest
     steps:
       - name: Check out caller repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -149,23 +150,41 @@ jobs:
           else
             echo "rdjsonl_exists=false" >> "$GITHUB_OUTPUT"
           fi
+          if [[ -f "${{ inputs.sarif_output_path }}" ]]; then
+            sarif_result_count="$(python3 -c 'import json, sys; data = json.load(open(sys.argv[1], encoding="utf-8")); print(sum(len(run.get("results", [])) for run in data.get("runs", [])))' "${{ inputs.sarif_output_path }}")"
+            echo "sarif_result_count=${sarif_result_count}" >> "$GITHUB_OUTPUT"
+            if (( sarif_result_count <= 25000 )); then
+              echo "sarif_uploadable=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "sarif_uploadable=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "sarif_result_count=0" >> "$GITHUB_OUTPUT"
+            echo "sarif_uploadable=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Upload SARIF results
-        if: ${{ always() && inputs.upload_sarif && steps.output_files.outputs.sarif_exists == 'true' }}
-        uses: github/codeql-action/upload-sarif@v3
+        if: ${{ always() && inputs.upload_sarif && steps.output_files.outputs.sarif_exists == 'true' && steps.output_files.outputs.sarif_uploadable == 'true' }}
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: ${{ inputs.sarif_output_path }}
 
+      - name: Warn when SARIF upload is skipped
+        if: ${{ always() && inputs.upload_sarif && steps.output_files.outputs.sarif_exists == 'true' && steps.output_files.outputs.sarif_uploadable != 'true' }}
+        shell: bash
+        run: |
+          echo "::warning::Skipping SARIF upload because the report contains ${{ steps.output_files.outputs.sarif_result_count }} results and GitHub code scanning rejects runs above 25000 results. HTML/CSV artifacts and analyzer exit-code enforcement still apply."
+
       - name: Upload HTML report artifact
         if: ${{ always() && inputs.html_report && steps.output_files.outputs.html_exists == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: sapcc-lint-html-report
           path: ${{ inputs.html_output_path }}
 
       - name: Upload CSV report artifact
         if: ${{ always() && inputs.csv_report && steps.output_files.outputs.csv_exists == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: sapcc-lint-csv-report
           path: ${{ inputs.csv_output_path }}
@@ -184,7 +203,7 @@ jobs:
         run: |
           reviewdog \
             -f=rdjsonl \
-            -name="sapcc-lint" \
+            -name="sap-cc-lint" \
             -reporter=github-pr-review \
             -filter-mode=added \
             -fail-level=none \
