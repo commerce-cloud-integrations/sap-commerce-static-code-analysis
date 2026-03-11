@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       version:
-        description: Release tag to download, for example v0.1.1.
+        description: Release tag to download, for example v0.1.5.
         required: true
         type: string
       repo_path:

@@ -30,9 +30,10 @@ class RdjsonlReporter(
         val path = finding.relativePath(repo)
         val line = finding.location.position.line
         val column = finding.location.position.column
+        val renderedMessage = finding.message.escapeReviewdogText()
 
         return RdjsonlDiagnostic(
-            message = finding.message,
+            message = renderedMessage,
             severity = finding.severity.toRdjsonSeverity(),
             code = RdjsonlCode(value = finding.ruleId),
             source = RdjsonlSource(name = "sapcc-lint"),
@@ -43,7 +44,7 @@ class RdjsonlReporter(
                     end = RdjsonlPosition(line = line, column = column),
                 ),
             ),
-            originalOutput = "[${finding.severity.name}] [${finding.domain.cliValue}] ${finding.ruleId}:$line:$column ${finding.message}",
+            originalOutput = "[${finding.severity.name}] [${finding.domain.cliValue}] ${finding.ruleId}:$line:$column $renderedMessage",
         )
     }
 }
@@ -84,3 +85,10 @@ data class RdjsonlPosition(
     val line: Int,
     val column: Int,
 )
+
+private fun String.escapeReviewdogText(): String {
+    return this
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+}

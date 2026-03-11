@@ -67,6 +67,49 @@ class RdjsonlReporterTest {
         assertTrue(diagnostic["originalOutput"].asText().contains("SampleRule:12:4"))
     }
 
+    @Test
+    fun write_whenFindingMessageContainsXmlLikeTokens_escapesReviewdogFacingText() {
+        val repo = Files.createTempDirectory("sapcc-lint-rdjsonl-reporter-html")
+        val output = repo.resolve("build/reports/findings.rdjsonl")
+        val finding = Finding(
+            ruleId = "XmlRule",
+            severity = FindingSeverity.ERROR,
+            message = "Element <bogus> is not allowed inside <context> & must stay literal.",
+            location = FindingLocation(
+                file = repo.resolve("custom/core/resources/config.xml"),
+                position = SourcePosition(line = 3, column = 7),
+            ),
+            entityKey = "xml",
+            domain = AnalysisDomain.COCKPIT_NG,
+        )
+        val result = AnalysisResult(
+            repo = repo,
+            config = AnalyzerConfig(),
+            scan = RepositoryScan(repo = repo, filesByDomain = emptyMap()),
+            domainResults = listOf(
+                DomainAnalysisResult(
+                    domain = AnalysisDomain.COCKPIT_NG,
+                    analyzedFileCount = 1,
+                    findings = listOf(finding),
+                    rules = listOf(sampleRule("XmlRule", FindingSeverity.ERROR, AnalysisDomain.COCKPIT_NG)),
+                )
+            ),
+            findings = listOf(finding),
+            rules = listOf(sampleRule("XmlRule", FindingSeverity.ERROR, AnalysisDomain.COCKPIT_NG)),
+        )
+
+        RdjsonlReporter().write(result, output)
+
+        val diagnostic = objectMapper.readTree(Files.readAllLines(output).single())
+        assertEquals(
+            "Element &lt;bogus&gt; is not allowed inside &lt;context&gt; &amp; must stay literal.",
+            diagnostic["message"].asText(),
+        )
+        assertTrue(diagnostic["originalOutput"].asText().contains("&lt;bogus&gt;"))
+        assertTrue(diagnostic["originalOutput"].asText().contains("&lt;context&gt;"))
+        assertTrue(diagnostic["originalOutput"].asText().contains("&amp;"))
+    }
+
     private fun sampleRule(
         ruleIdValue: String,
         severityValue: FindingSeverity,

@@ -136,7 +136,7 @@ HTML only:
 
 ```yaml
 with:
-  version: v0.1.4
+  version: v0.1.5
   html_report: true
 ```
 
@@ -144,7 +144,7 @@ CSV only:
 
 ```yaml
 with:
-  version: v0.1.4
+  version: v0.1.5
   csv_report: true
 ```
 
@@ -152,7 +152,7 @@ Both:
 
 ```yaml
 with:
-  version: v0.1.4
+  version: v0.1.5
   html_report: true
   csv_report: true
 ```
